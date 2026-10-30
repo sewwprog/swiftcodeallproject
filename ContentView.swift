@@ -35,21 +35,63 @@ private enum AMPalette {
     static func accent(_ theme: String) -> Color { AMProfileStyle.blue }
 }
 
-// MARK: - Native Liquid Glass dock (iOS 26/27) with iOS 17–25 fallback.
-// Keeping the native glass effect behind a version check avoids changing the
-// deployment target or any app configuration / saved user preferences.
-private struct AMNativeGlassSurface: ViewModifier {
+// MARK: - iOS 27 Liquid Glass system
+// Native Liquid Glass on iOS 26+, rich material fallbacks on iOS 17–25.
+// All glass is behind version checks — no deployment target changes.
+private enum AMGlassStyle {
+    case regular      // dock / mini player
+    case tinted       // lightly tinted with accent
+    case elevated     // stronger chrome glass for cards
+    case thin         // subtle glass for headers and rows
+}
+
+private struct AMGlassSurface: ViewModifier {
+    let style: AMGlassStyle
+    let cornerRadius: CGFloat
+
     @ViewBuilder
     func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular, in: Capsule())
+            switch style {
+            case .regular:
+                content.glassEffect(.regular, in: shape)
+            case .tinted:
+                content.glassEffect(.regular, in: shape)
+                    .background(AMProfileStyle.blue.opacity(0.10), in: shape)
+            case .elevated:
+                content.glassEffect(.regular, in: shape)
+                    .background(AMProfileStyle.blue.opacity(0.08), in: shape)
+                    .overlay {
+                        shape.strokeBorder(.white.opacity(0.5), lineWidth: 0.7)
+                    }
+            case .thin:
+                content.glassEffect(.regular, in: shape)
+                    .opacity(0.92)
+            }
         } else {
-            content.background(.ultraThinMaterial, in: Capsule())
+            let material: Material = {
+                switch style {
+                case .regular, .thin: return .ultraThinMaterial
+                case .tinted: return .ultraThinMaterial
+                case .elevated: return .thinMaterial
+                }
+            }()
+            content.background(material, in: shape)
+                .overlay {
+                    if style == .elevated {
+                        shape.strokeBorder(.white.opacity(0.25), lineWidth: 0.7)
+                    }
+                }
         }
     }
 }
+
 private extension View {
-    func amNativeGlass() -> some View { modifier(AMNativeGlassSurface()) }
+    func amGlass(_ style: AMGlassStyle = .regular, cornerRadius: CGFloat = 22) -> some View {
+        modifier(AMGlassSurface(style: style, cornerRadius: cornerRadius))
+    }
+    func amNativeGlass() -> some View { modifier(AMGlassSurface(style: .regular, cornerRadius: 22)) }
 }
 
 // MARK: - Native-feeling motion (respects Reduce Motion)
@@ -2064,7 +2106,7 @@ struct ContentView: View {
         .foregroundStyle(AMProfileStyle.blue)
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
-        .background(AMPalette.card(theme))
+        .amGlass(.thin, cornerRadius: 0)
         .overlay(alignment: .bottom) { AMProfileStyle.blue.opacity(0.12).frame(height: 1) }
     }
     // MARK: - AMusic · Minimal Music Library
@@ -2120,7 +2162,7 @@ struct ContentView: View {
         }
         .foregroundStyle(AMPalette.primary(theme))
         .buttonStyle(AMPressStyle())
-        .background(AMPalette.card(theme), in: RoundedRectangle(cornerRadius: 13))
+        .amGlass(.elevated, cornerRadius: 13)
         .overlay {
             RoundedRectangle(cornerRadius: 13)
                 .strokeBorder(AMPalette.elevated(theme).opacity(0.6), lineWidth: 0.5)
@@ -2170,7 +2212,7 @@ struct ContentView: View {
         .padding(.leading, 12)
         .padding(.trailing, search.isEmpty ? 12 : 0)
         .frame(minHeight: 44)
-        .background(AMPalette.card(theme), in: RoundedRectangle(cornerRadius: 15))
+        .amGlass(.thin, cornerRadius: 15)
         .overlay { RoundedRectangle(cornerRadius: 15).strokeBorder(AMProfileStyle.blue.opacity(0.10), lineWidth: 1) }
     }
 
@@ -2197,7 +2239,7 @@ struct ContentView: View {
                 Label("Перемішати", systemImage: "shuffle")
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .foregroundStyle(AMPalette.primary(theme))
-                    .background(AMPalette.card(theme), in: RoundedRectangle(cornerRadius: 12))
+                    .amGlass(.thin, cornerRadius: 12)
             }
         }
         .font(.system(size: 13, weight: .semibold))
@@ -2859,7 +2901,7 @@ struct ContentView: View {
                     .padding(.horizontal, 14)
                     .frame(minHeight: 72)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AMPalette.card(theme), in: RoundedRectangle(cornerRadius: 17))
+                    .amGlass(.elevated, cornerRadius: 17)
                     .contentShape(RoundedRectangle(cornerRadius: 17))
                 }
                 .buttonStyle(.plain)
@@ -2880,7 +2922,7 @@ struct ContentView: View {
                         showSettings = true
                     }
                 }
-                .background(AMPalette.card(theme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .amGlass(.elevated, cornerRadius: 16)
 
                 Text("AMusic " + AMRelease.version)
                     .font(.system(size: 11, weight: .medium))
@@ -3065,7 +3107,7 @@ struct ContentView: View {
                         }
                     }
                     .padding(18)
-                    .background(AMPalette.card(theme), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .amGlass(.elevated, cornerRadius: 20)
 
                     if settingsSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         settingsGroup("Звук і плеєр", pages: [.player, .playerUI])
@@ -3149,7 +3191,7 @@ struct ContentView: View {
                     if page != pages.last { settingsRowDivider }
                 }
             }
-            .background(AMPalette.card(theme), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .amGlass(.elevated, cornerRadius: 18)
         }
     }
 
